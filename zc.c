@@ -70,14 +70,14 @@ int __get_userbuf(uint8_t __user *addr, uint32_t len, int write,
 	ret = get_user_pages(task, mm,
 			(unsigned long)addr, pgcount, write, pg, NULL);
 #elif (LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0))
-	ret = get_user_pages_remote(task, mm,
+	ret = get_user_pages_remote(mm,
 			(unsigned long)addr, pgcount, write, 0, pg, NULL);
 #elif (LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0))
-	ret = get_user_pages_remote(task, mm,
+	ret = get_user_pages_remote(mm,
 			(unsigned long)addr, pgcount, write ? FOLL_WRITE : 0,
 			pg, NULL);
 #else
-	ret = get_user_pages_remote(task, mm,
+	ret = get_user_pages_remote(mm,
 			(unsigned long)addr, pgcount, write ? FOLL_WRITE : 0,
 			pg, NULL, NULL);
 #endif
