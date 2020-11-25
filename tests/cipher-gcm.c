@@ -5,6 +5,7 @@
  *
  */
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
 #include <unistd.h>
@@ -15,13 +16,13 @@
 #include "testhelper.h"
 
 #define	DATA_SIZE	(8*1024)
-#define AUTH_SIZE       31
+#define AUTH_SIZE       32
 #define	BLOCK_SIZE	16
 #define	KEY_SIZE	16
 
 #define my_perror(x) {fprintf(stderr, "%s: %d\n", __func__, __LINE__); perror(x); }
 
-static int debug = 0;
+static int debug = 1;
 
 static void print_buf(char *desc, const unsigned char *buf, int size)
 {
@@ -37,7 +38,7 @@ struct aes_gcm_vectors_st {
 	const uint8_t *key;
 	const uint8_t *auth;
 	int auth_size;
-	const uint8_t *plaintext;
+	const uint8_t __attribute__ ((aligned (32))) *plaintext;
 	int plaintext_size;
 	const uint8_t *iv;
 	const uint8_t *ciphertext;
@@ -74,18 +75,18 @@ struct aes_gcm_vectors_st aes_gcm_vectors[] = {
 	},
 	{
 	 .key = (uint8_t *)
-	 "\xfe\xff\xe9\x92\x86\x65\x73\x1c\x6d\x6a\x8f\x94\x67\x30\x83\x08",
+	 "\x48\xB7\xF3\x37\xCD\xF9\x25\x26\x87\xEC\xC7\x60\xBD\x8E\xC1\x84",
 	 .auth = (uint8_t *)
-	 "\xfe\xed\xfa\xce\xde\xad\xbe\xef\xfe\xed\xfa\xce\xde\xad\xbe\xef\xab\xad\xda\xd2",
-	 .auth_size = 20,
+	 "\x7D\x92\x4C\xFD\x37\xB3\xD0\x46\xA9\x6E\xB5\xE1\x32\x04\x24\x05\xC8\x73\x1E\x06\x50\x97\x87\xBB\xEB\x41\xF2\x58\x27\x57\x46\x49\x5E\x88\x4D\x69\x87\x1F\x77\x63\x4C\x58\x4B\xB0\x07\x31\x22\x34",
+	 .auth_size = 48,
 	 .plaintext = (uint8_t *)
-	 "\xd9\x31\x32\x25\xf8\x84\x06\xe5\xa5\x59\x09\xc5\xaf\xf5\x26\x9a\x86\xa7\xa9\x53\x15\x34\xf7\xda\x2e\x4c\x30\x3d\x8a\x31\x8a\x72\x1c\x3c\x0c\x95\x95\x68\x09\x53\x2f\xcf\x0e\x24\x49\xa6\xb5\x25\xb1\x6a\xed\xf5\xaa\x0d\xe6\x57\xba\x63\x7b\x39",
-	 .plaintext_size = 60,
+	 "\xBB\x2B\xAC\x67\xA4\x70\x94\x30\xC3\x9C\x2E\xB9\xAC\xFA\xBC\x0D\x45\x6C\x80\xD3\x0A\xA1\x73\x4E\x57\x99\x7D\x54\x8A\x8F\x06\x03",
+	 .plaintext_size = 32,
 	 .ciphertext = (uint8_t *)
-	 "\x42\x83\x1e\xc2\x21\x77\x74\x24\x4b\x72\x21\xb7\x84\xd0\xd4\x9c\xe3\xaa\x21\x2f\x2c\x02\xa4\xe0\x35\xc1\x7e\x23\x29\xac\xa1\x2e\x21\xd5\x14\xb2\x54\x66\x93\x1c\x7d\x8f\x6a\x5a\xac\x84\xaa\x05\x1b\xa3\x0b\x39\x6a\x0a\xac\x97\x3d\x58\xe0\x91",
-	 .iv = (uint8_t *)"\xca\xfe\xba\xbe\xfa\xce\xdb\xad\xde\xca\xf8\x88",
+	 "\xD2\x63\x22\x8B\x8C\xE0\x51\xF6\x7E\x9B\xAF\x1C\xE7\xDF\x97\xD1\x0C\xD5\xF3\xBC\x97\x23\x62\x05\x51\x30\xC7\xD1\x3C\x3A\xB2\xE7",
+	 .iv = (uint8_t *)"\x3E\x89\x4E\xBB\x16\xCE\x82\xA5\x3C\x3E\x05\xB2",
 	 .tag = (uint8_t *)
-	 "\x5b\xc9\x4f\xbc\x32\x21\xa5\xdb\x94\xfa\xe9\x5a\xe7\x12\x1a\x47"
+	 "\x71\x44\x67\x37\xCA\x1F\xA9\x2E\x6D\x02\x6D\x7D\x2E\xD1\xAA\x9C"
 	}
 };
 
@@ -95,12 +96,14 @@ struct aes_gcm_vectors_st aes_gcm_vectors[] = {
 static int test_crypto(int cfd)
 {
 	int i;
-	uint8_t tmp[128];
+	uint8_t __attribute__ ((aligned (32))) tmp[128];
+	uint8_t __attribute__ ((aligned (32))) in[128];
 
 	struct session_op sess;
 	struct crypt_auth_op cao;
 
 	/* Get crypto session for AES128 */
+
 
 	if (debug) {
 		fprintf(stdout, "Tests on AES-GCM vectors: ");
@@ -109,6 +112,7 @@ static int test_crypto(int cfd)
 	for (i = 0;
 	     i < sizeof(aes_gcm_vectors) / sizeof(aes_gcm_vectors[0]);
 	     i++) {
+		memcpy(in, aes_gcm_vectors[i].plaintext, sizeof(in));
 		memset(&sess, 0, sizeof(sess));
 		memset(tmp, 0, sizeof(tmp));
 
@@ -136,7 +140,7 @@ static int test_crypto(int cfd)
 		}
 
 		if (aes_gcm_vectors[i].plaintext_size > 0) {
-			cao.src = (void *) aes_gcm_vectors[i].plaintext;
+			cao.src = (void *) in;
 			cao.len = aes_gcm_vectors[i].plaintext_size;
 		}
 
@@ -158,6 +162,9 @@ static int test_crypto(int cfd)
 				return 1;
 			}
 
+		print_buf("Cipher: ", tmp, aes_gcm_vectors[i].plaintext_size);
+		print_buf("Expected: ", aes_gcm_vectors[i].ciphertext, aes_gcm_vectors[i].plaintext_size);
+
 		if (memcmp
 		    (&tmp[cao.len - cao.tag_len], aes_gcm_vectors[i].tag,
 		     16) != 0) {
@@ -170,6 +177,9 @@ static int test_crypto(int cfd)
 				  aes_gcm_vectors[i].tag, 16);
 			return 1;
 		}
+		print_buf("Tag: ", &tmp[cao.len - cao.tag_len], cao.tag_len);
+		print_buf("Expected tag: ",
+				  aes_gcm_vectors[i].tag, 16);
 
 	}
 	
@@ -297,6 +307,7 @@ static int test_encrypt_decrypt(int cfd)
 	}
 
 	/* Verify the result */
+
 	if (memcmp(plaintext, ciphertext, DATA_SIZE) != 0) {
 		int i;
 		fprintf(stderr,
@@ -307,7 +318,7 @@ static int test_encrypt_decrypt(int cfd)
 				printf("\n");
 			printf("%02x ", plaintext[i]);
 		}
-		printf("ciphertext:");
+		printf("decipher:");
 		for (i = 0; i < DATA_SIZE; i++) {
 			if ((i % 30) == 0)
 				printf("\n");
@@ -498,12 +509,6 @@ int main(int argc, char** argv)
 		return 1;
 
 	if (test_encrypt_decrypt(cfd))
-		return 1;
-
-	if (test_encrypt_decrypt_error(cfd, 0))
-		return 1;
-
-	if (test_encrypt_decrypt_error(cfd, 1))
 		return 1;
 
 	/* Close cloned descriptor */
